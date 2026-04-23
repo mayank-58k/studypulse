@@ -46,12 +46,27 @@ export default {
             transform: "translate(var(--tx), var(--ty)) rotate(720deg)",
             opacity: "0"
           }
+        },
+        "pulse-danger": {
+          "0%, 100%": { opacity: "1", boxShadow: "0 0 0 0 rgba(255, 107, 53, 0.4)" },
+          "50%": { opacity: "0.9", boxShadow: "0 0 0 8px rgba(255, 107, 53, 0)" }
+        },
+        "slide-in": {
+          from: { transform: "translateX(100%)", opacity: "0" },
+          to: { transform: "translateX(0)", opacity: "1" }
+        },
+        sparkle: {
+          "0%, 100%": { transform: "scale(1)", opacity: "1" },
+          "50%": { transform: "scale(1.2)", opacity: "0.8" }
         }
       },
       animation: {
         glow: "glow 2s ease-in-out infinite",
         flicker: "flicker 3s ease-in-out",
-        confetti: "confetti 3s ease-out"
+        confetti: "confetti 3s ease-out",
+        "pulse-danger": "pulse-danger 1.5s ease-in-out infinite",
+        sparkle: "sparkle 0.6s ease-in-out",
+        "slide-in": "slide-in 0.3s ease-out"
       }
     }
   },

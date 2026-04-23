@@ -5,7 +5,7 @@ import api from "../api/axios";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import Modal from "../components/ui/Modal";
-import Spinner from "../components/ui/Spinner";
+import SkeletonLoader from "../components/ui/SkeletonLoader";
 import { calcWeightedAverage } from "../utils/gpaCalculator";
 
 const blankSubject = { name: "", color: "#10b981", icon: "BookOpen", targetGrade: 85, semester: "Spring" };
@@ -109,14 +109,14 @@ export default function Subjects() {
     loadGrades(activeId);
   };
 
-  if (loading) return <Spinner text="Loading subjects..." />;
+  if (loading) return <div className="space-y-4"><SkeletonLoader height="h-16" /><SkeletonLoader height="h-48" count={3} /></div>;
 
   return (
     <div className="space-y-4">
       <div className="card p-4 flex flex-wrap gap-2 items-center justify-between">
         <div>
-          <h2 className="text-2xl font-display">Subjects</h2>
-          <p className="text-sm text-white/70">Estimated GPA: {gpaEstimate}</p>
+          <h2 className="text-2xl font-heading font-bold">Subjects</h2>
+          <p className="text-sm text-white/60">Estimated GPA: <span className="text-neon-primary font-mono">{gpaEstimate}</span></p>
         </div>
         <div className="flex gap-2">
           <select className="input" value={semesterFilter} onChange={(e) => setSemesterFilter(e.target.value)}>
@@ -133,16 +133,20 @@ export default function Subjects() {
           const subjectGrades = grades.filter((g) => g.subject === subject._id || g.subject?._id === subject._id);
           const avg = calcWeightedAverage(subjectGrades);
           return (
-            <div className="card p-4" key={subject._id}>
+            <div
+              className="card p-4 hover:-translate-y-1 transition-transform duration-300 border-l-4"
+              style={{ borderLeftColor: subject.color || '#00ff88' }}
+              key={subject._id}
+            >
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-lg">{subject.name}</h3>
+                  <h3 className="text-lg font-semibold">{subject.name}</h3>
                   <p className="text-sm text-white/60">{subject.semester || "Unknown semester"}</p>
                 </div>
                 <div className="w-4 h-4 rounded-full" style={{ backgroundColor: subject.color }} />
               </div>
-              <p className="mt-2 text-gold-400 font-mono">Average: {avg}%</p>
-              <div className="mt-3 flex gap-2">
+              <p className="mt-2 font-mono font-bold" style={{ color: subject.color || '#00ff88' }}>Average: {avg}%</p>
+              <div className="mt-3 flex gap-2 flex-wrap">
                 <Button variant="secondary" onClick={() => loadGrades(subject._id)}>
                   View Grades
                 </Button>
@@ -204,9 +208,9 @@ export default function Subjects() {
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={[...grades].sort((a, b) => new Date(a.date) - new Date(b.date)).map((g) => ({ ...g, percent: (g.score / g.maxScore) * 100 }))}>
                   <XAxis dataKey="title" hide />
-                  <YAxis domain={[0, 100]} />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="percent" stroke="#f0b429" strokeWidth={2} />
+                  <YAxis domain={[0, 100]} tick={{ fill: '#ffffff60', fontSize: 11 }} />
+                  <Tooltip contentStyle={{ background: '#1a1d2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8 }} />
+                  <Line type="monotone" dataKey="percent" stroke="#00ff88" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             </div>

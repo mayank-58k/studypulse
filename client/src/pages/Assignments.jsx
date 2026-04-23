@@ -6,7 +6,7 @@ import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import Modal from "../components/ui/Modal";
 import Badge from "../components/ui/Badge";
-import Spinner from "../components/ui/Spinner";
+import SkeletonLoader from "../components/ui/SkeletonLoader";
 import { humanDueDate } from "../utils/dateHelpers";
 
 const columns = [
@@ -81,7 +81,7 @@ export default function Assignments() {
     load();
   };
 
-  if (loading) return <Spinner text="Loading assignments..." />;
+  if (loading) return <div className="space-y-4"><SkeletonLoader height="h-16" /><SkeletonLoader height="h-64" count={3} /></div>;
 
   return (
     <div className="space-y-4">

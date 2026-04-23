@@ -4,66 +4,61 @@ import api from "../api/axios";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import Modal from "../components/ui/Modal";
-import Spinner from "../components/ui/Spinner";
+import SkeletonLoader from "../components/ui/SkeletonLoader";
+import ProgressRing from "../components/ui/ProgressRing";
 
-const initialForm = { title: "", type: "custom", targetValue: 10, deadline: "" };
+const initialForm = { title: "", type: "custom", targetValue: 10, deadline: "", tab: "week" };
+const TABS = [
+  { key: "today", label: "Today" },
+  { key: "week", label: "This Week" },
+  { key: "month", label: "This Month" },
+  { key: "custom", label: "Custom" },
+];
 
-function ProgressRing({ value, target }) {
-  const percent = Math.min(100, Math.round(((value || 0) / (target || 1)) * 100));
-  const radius = 44;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (percent / 100) * circumference;
+function GoalCard({ goal, onUpdate, onComplete }) {
+  const percent = Math.min(100, Math.round(((goal.currentValue || 0) / (goal.targetValue || 1)) * 100));
   return (
-    <svg width="110" height="110" viewBox="0 0 110 110">
-      <circle cx="55" cy="55" r={radius} stroke="#252840" strokeWidth="10" fill="none" />
-      <circle
-        cx="55"
-        cy="55"
-        r={radius}
-        stroke="#f0b429"
-        strokeWidth="10"
-        fill="none"
-        strokeDasharray={circumference}
-        strokeDashoffset={offset}
-        transform="rotate(-90 55 55)"
-      />
-      <text x="55" y="60" textAnchor="middle" fontSize="16" fill="white">
-        {percent}%
-      </text>
-    </svg>
+    <div className="card p-4 flex gap-4 items-center hover:-translate-y-1 transition-transform duration-300">
+      <ProgressRing value={goal.currentValue} target={goal.targetValue} color="#00ff88" />
+      <div className="flex-1 min-w-0">
+        <h3 className="font-semibold text-white truncate">{goal.title}</h3>
+        <p className="text-sm text-white/50 mt-0.5">{goal.currentValue}/{goal.targetValue} · {goal.type}</p>
+        {goal.deadline && <p className="text-xs text-white/40 mt-0.5">Due {new Date(goal.deadline).toLocaleDateString()}</p>}
+        <div className="h-1.5 bg-navy-700 rounded-full mt-2 overflow-hidden">
+          <div className="h-full bg-neon-primary rounded-full transition-all" style={{ width: `${percent}%` }} />
+        </div>
+        <div className="mt-3 flex gap-2">
+          <Button variant="secondary" onClick={() => onUpdate(goal)} className="text-xs py-1 px-3">Update</Button>
+          <Button onClick={() => onComplete(goal)} className="text-xs py-1 px-3">Complete ✓</Button>
+        </div>
+      </div>
+    </div>
   );
 }
 
 export default function Goals() {
   const [loading, setLoading] = useState(true);
   const [goals, setGoals] = useState([]);
-  const [badges, setBadges] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(initialForm);
+  const [activeTab, setActiveTab] = useState("week");
 
   const load = async () => {
     setLoading(true);
     try {
-      const [goalsRes, badgesRes] = await Promise.all([api.get("/goals"), api.get("/badges")]);
-      setGoals(goalsRes.data);
-      setBadges(badgesRes.data);
-    } finally {
-      setLoading(false);
-    }
+      const { data } = await api.get("/goals");
+      setGoals(data);
+    } finally { setLoading(false); }
   };
 
-  useEffect(() => {
-    load();
-  }, []);
+  useEffect(() => { load(); }, []);
 
   const addGoal = async (e) => {
     e.preventDefault();
     if (!form.title || Number(form.targetValue) <= 0) return toast.error("Enter valid goal details");
     await api.post("/goals", { ...form, targetValue: Number(form.targetValue), currentValue: 0 });
-    toast.success("Goal created");
-    setForm(initialForm);
-    setShowModal(false);
-    load();
+    toast.success("Goal created! 🎯");
+    setForm(initialForm); setShowModal(false); load();
   };
 
   const updateProgress = async (goal) => {
@@ -71,99 +66,90 @@ export default function Goals() {
     if (raw === null) return;
     const currentValue = Number(raw);
     if (Number.isNaN(currentValue)) return;
-    await api.patch(`/goals/${goal._id}/progress`, { currentValue });
-    load();
+    await api.patch(`/goals/${goal._id}/progress`, { currentValue }); load();
   };
 
   const markComplete = async (goal) => {
     await api.patch(`/goals/${goal._id}/progress`, { currentValue: goal.targetValue, completed: true });
-    toast.success("Goal completed");
-    load();
+    toast.success("Goal completed! 🏆"); load();
   };
 
-  if (loading) return <Spinner text="Loading goals..." />;
+  if (loading) return <div className="space-y-4"><SkeletonLoader height="h-16" /><SkeletonLoader height="h-48" count={2} /></div>;
 
-  const activeGoals = goals.filter((g) => !g.completed);
-  const completedGoals = goals.filter((g) => g.completed);
+  const activeGoals = goals.filter(g => !g.completed);
+  const completedGoals = goals.filter(g => g.completed);
+
+  const tabGoals = activeGoals.filter(g => {
+    if (activeTab === 'today') return g.type === 'study_hours' || g.deadline?.slice(0, 10) === new Date().toISOString().slice(0, 10);
+    if (activeTab === 'week') return g.type !== 'custom' || !g.deadline || true;
+    if (activeTab === 'month') return true;
+    return g.type === 'custom';
+  });
 
   return (
     <div className="space-y-4">
       <div className="card p-4 flex items-center justify-between">
-        <h2 className="text-2xl font-display">Goals</h2>
-        <Button onClick={() => setShowModal(true)}>Add Goal</Button>
+        <h2 className="text-2xl font-heading font-bold">Goals</h2>
+        <Button onClick={() => setShowModal(true)}>+ Add Goal</Button>
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-3">
-        {activeGoals.map((goal) => (
-          <div className="card p-4 flex gap-4 items-center" key={goal._id}>
-            <ProgressRing value={goal.currentValue} target={goal.targetValue} />
-            <div className="flex-1">
-              <h3 className="text-lg">{goal.title}</h3>
-              <p className="text-sm text-white/70">
-                {goal.currentValue}/{goal.targetValue} - {goal.type}
-              </p>
-              <p className="text-xs text-white/60">Deadline: {goal.deadline ? new Date(goal.deadline).toLocaleDateString() : "None"}</p>
-              <div className="mt-3 flex gap-2">
-                <Button variant="secondary" onClick={() => updateProgress(goal)}>
-                  Update Progress
-                </Button>
-                <Button onClick={() => markComplete(goal)}>Mark Complete</Button>
-              </div>
-            </div>
-          </div>
+      {/* Tabs */}
+      <div className="card p-2 flex gap-1">
+        {TABS.map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`flex-1 py-2 px-3 rounded-xl text-sm font-medium transition-all duration-300 ${
+              activeTab === tab.key
+                ? 'bg-neon-primary/10 text-neon-primary border border-neon-primary/30'
+                : 'text-white/60 hover:text-white hover:bg-white/5'
+            }`}
+          >{tab.label}</button>
         ))}
       </div>
 
-      <div className="card p-4">
-        <h3 className="text-lg mb-2">Completed Goals</h3>
-        <div className="space-y-2">
-          {completedGoals.length ? (
-            completedGoals.map((goal) => (
-              <div key={goal._id} className="bg-navy-700 rounded-lg p-3">
-                {goal.title} - completed
-              </div>
-            ))
-          ) : (
-            <p className="text-sm text-white/60">No completed goals yet.</p>
-          )}
+      {/* Active goals grid */}
+      {tabGoals.length > 0 ? (
+        <div className="grid lg:grid-cols-2 gap-3">
+          {tabGoals.map(goal => (
+            <GoalCard key={goal._id} goal={goal} onUpdate={updateProgress} onComplete={markComplete} />
+          ))}
         </div>
-      </div>
-
-      <div className="card p-4">
-        <h3 className="text-lg mb-2">Badge Grid</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-          {badges.length ? (
-            badges.map((badge) => (
-              <div key={badge._id} className="rounded-lg bg-navy-700 p-3">
-                <p>{badge.title}</p>
-                <p className="text-xs text-white/60">{badge.type}</p>
-              </div>
-            ))
-          ) : (
-            <p className="text-sm text-white/60">Badges will unlock as you progress.</p>
-          )}
+      ) : (
+        <div className="card p-8 text-center">
+          <p className="text-4xl mb-3">🎯</p>
+          <p className="text-white/50">No goals for this period. Create one!</p>
+          <Button className="mt-4" onClick={() => setShowModal(true)}>Add Goal</Button>
         </div>
-      </div>
+      )}
 
-      <Modal open={showModal} title="Create Goal" onClose={() => setShowModal(false)}>
+      {/* Completed goals */}
+      {completedGoals.length > 0 && (
+        <div className="card p-4">
+          <h3 className="text-lg font-semibold mb-3">✅ Completed Goals ({completedGoals.length})</h3>
+          <div className="space-y-2">
+            {completedGoals.map(goal => (
+              <div key={goal._id} className="bg-neon-primary/5 border border-neon-primary/10 rounded-xl p-3 flex items-center gap-3">
+                <span className="text-neon-primary text-lg">✓</span>
+                <div><p className="font-medium text-white/80">{goal.title}</p><p className="text-xs text-white/40">{goal.type}</p></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <Modal open={showModal} title="Create Goal 🎯" onClose={() => setShowModal(false)}>
         <form onSubmit={addGoal} className="space-y-3">
-          <Input label="Title" value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))} />
+          <Input label="Title" value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} />
           <label className="block space-y-1">
             <span className="text-sm text-white/70">Type</span>
-            <select className="input" value={form.type} onChange={(e) => setForm((p) => ({ ...p, type: e.target.value }))}>
-              {["gpa", "study_hours", "assignments", "streak", "custom"].map((type) => (
-                <option key={type}>{type}</option>
-              ))}
+            <select className="input" value={form.type} onChange={e => setForm(p => ({ ...p, type: e.target.value }))}>
+              {["gpa", "study_hours", "assignments", "streak", "custom"].map(t => <option key={t}>{t}</option>)}
             </select>
           </label>
-          <Input
-            label="Target value"
-            type="number"
-            value={form.targetValue}
-            onChange={(e) => setForm((p) => ({ ...p, targetValue: e.target.value }))}
-          />
-          <Input label="Deadline" type="date" value={form.deadline} onChange={(e) => setForm((p) => ({ ...p, deadline: e.target.value }))} />
-          <Button className="w-full">Create Goal</Button>
+          <Input label="Target value" type="number" value={form.targetValue} onChange={e => setForm(p => ({ ...p, targetValue: e.target.value }))} />
+          <Input label="Deadline" type="date" value={form.deadline} onChange={e => setForm(p => ({ ...p, deadline: e.target.value }))} />
+          <Button className="w-full">Create Goal 🎯</Button>
         </form>
       </Modal>
     </div>

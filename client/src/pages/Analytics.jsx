@@ -16,10 +16,12 @@ import {
   YAxis
 } from "recharts";
 import api from "../api/axios";
-import Spinner from "../components/ui/Spinner";
+import SkeletonLoader from "../components/ui/SkeletonLoader";
+import LeaderboardSection from "../components/ui/LeaderboardSection";
 import { calcWeightedAverage } from "../utils/gpaCalculator";
+import { calcPersonalBests } from "../utils/leaderboardHelpers";
 
-const colors = ["#f0b429", "#10b981", "#60a5fa", "#f472b6", "#f97316", "#a78bfa"];
+const colors = ["#00ff88", "#00d4ff", "#ff6b35", "#f472b6", "#f97316", "#a78bfa"];
 
 export default function Analytics() {
   const [loading, setLoading] = useState(true);
@@ -86,6 +88,8 @@ export default function Analytics() {
     return Object.entries(map).map(([week, hours]) => ({ week, hours: Number(hours.toFixed(1)) }));
   }, [sessions]);
 
+  const maxWeeklyHours = Math.max(...weeklyHours.map(w => w.hours), 0);
+
   const scatterData = useMemo(
     () =>
       performanceData.map((perf) => ({
@@ -99,15 +103,19 @@ export default function Analytics() {
   const sortedPerformance = [...performanceData].sort((a, b) => b.average - a.average);
   const best = sortedPerformance[0];
   const worst = sortedPerformance[sortedPerformance.length - 1];
+  const records = calcPersonalBests(sessions);
 
-  if (loading) return <Spinner text="Loading analytics..." />;
+  if (loading) return <div className="space-y-4"><SkeletonLoader height="h-24" /><SkeletonLoader height="h-72" count={2} /></div>;
 
   return (
     <div className="space-y-4">
       <div className="card p-4">
-        <h2 className="text-2xl font-display">Analytics</h2>
+        <h2 className="text-2xl font-heading font-bold">Analytics</h2>
         <p className="text-sm text-white/70">Semester summary and trend insights</p>
       </div>
+
+      {/* Personal Records */}
+      <LeaderboardSection records={records} />
 
       <div className="grid lg:grid-cols-2 gap-3">
         <div className="card p-4 h-72">
@@ -115,10 +123,10 @@ export default function Analytics() {
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={performanceData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#ffffff22" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="average" fill="#f0b429" />
+              <XAxis dataKey="name" tick={{ fill: '#ffffff60', fontSize: 11 }} />
+              <YAxis tick={{ fill: '#ffffff60', fontSize: 11 }} />
+              <Tooltip contentStyle={{ background: '#1a1d2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8 }} />
+              <Bar dataKey="average" fill="#00ff88" />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -131,7 +139,7 @@ export default function Analytics() {
                   <Cell key={entry.name} fill={colors[i % colors.length]} />
                 ))}
               </Pie>
-              <Tooltip />
+              <Tooltip contentStyle={{ background: '#1a1d2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8 }} />
             </PieChart>
           </ResponsiveContainer>
         </div>
@@ -144,9 +152,9 @@ export default function Analytics() {
             <LineChart data={gradeTrend}>
               <CartesianGrid strokeDasharray="3 3" stroke="#ffffff22" />
               <XAxis dataKey="date" hide />
-              <YAxis domain={[0, 100]} />
-              <Tooltip />
-              <Line dataKey="score" stroke="#10b981" strokeWidth={2} />
+              <YAxis domain={[0, 100]} tick={{ fill: '#ffffff60', fontSize: 11 }} />
+              <Tooltip contentStyle={{ background: '#1a1d2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8 }} />
+              <Line dataKey="score" stroke="#00ff88" strokeWidth={2} dot={false} />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -155,10 +163,10 @@ export default function Analytics() {
           <ResponsiveContainer width="100%" height="100%">
             <ScatterChart>
               <CartesianGrid strokeDasharray="3 3" stroke="#ffffff22" />
-              <XAxis dataKey="hours" name="Hours" />
-              <YAxis dataKey="gpa" name="Average" />
-              <Tooltip cursor={{ strokeDasharray: "3 3" }} />
-              <Scatter data={scatterData} fill="#60a5fa" />
+              <XAxis dataKey="hours" name="Hours" tick={{ fill: '#ffffff60', fontSize: 11 }} />
+              <YAxis dataKey="gpa" name="Average" tick={{ fill: '#ffffff60', fontSize: 11 }} />
+              <Tooltip cursor={{ strokeDasharray: "3 3" }} contentStyle={{ background: '#1a1d2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8 }} />
+              <Scatter data={scatterData} fill="#00d4ff" />
             </ScatterChart>
           </ResponsiveContainer>
         </div>
@@ -171,24 +179,28 @@ export default function Analytics() {
             <BarChart data={weeklyHours}>
               <CartesianGrid strokeDasharray="3 3" stroke="#ffffff22" />
               <XAxis dataKey="week" hide />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="hours" fill="#a78bfa" />
+              <YAxis tick={{ fill: '#ffffff60', fontSize: 11 }} />
+              <Tooltip contentStyle={{ background: '#1a1d2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8 }} />
+              <Bar dataKey="hours" radius={[4, 4, 0, 0]}>
+                {weeklyHours.map((entry, i) => (
+                  <Cell key={i} fill={entry.hours === maxWeeklyHours && entry.hours > 0 ? '#00ff88' : '#252840'} />
+                ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
         <div className="card p-4">
           <h3 className="mb-2">Best / Worst Subject</h3>
           <div className="space-y-3">
-            <div className="bg-emerald-500/20 rounded-xl p-3">
-              <p className="text-sm text-emerald-300">Best</p>
+            <div className="bg-neon-primary/10 rounded-xl p-3 border border-neon-primary/20">
+              <p className="text-sm text-neon-primary">Best</p>
               <p>{best?.name || "N/A"}</p>
-              <p className="text-xs">{best?.average?.toFixed?.(2) ?? 0}%</p>
+              <p className="text-xs text-white/60">{best?.average?.toFixed?.(2) ?? 0}%</p>
             </div>
-            <div className="bg-rose-500/20 rounded-xl p-3">
-              <p className="text-sm text-rose-300">Needs Improvement</p>
+            <div className="bg-neon-warning/10 rounded-xl p-3 border border-neon-warning/20">
+              <p className="text-sm text-neon-warning">Needs Improvement</p>
               <p>{worst?.name || "N/A"}</p>
-              <p className="text-xs">{worst?.average?.toFixed?.(2) ?? 0}%</p>
+              <p className="text-xs text-white/60">{worst?.average?.toFixed?.(2) ?? 0}%</p>
             </div>
             <p className="text-xs text-white/60">Subjects: {subjects.length} | Sessions: {sessions.length}</p>
           </div>

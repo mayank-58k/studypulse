@@ -30,9 +30,14 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen grid place-items-center p-4 bg-navy-900">
-      <form onSubmit={submit} className="card w-full max-w-md p-6 space-y-4">
-        <h1 className="text-4xl font-display text-gold-400">Create Account</h1>
+    <div className="min-h-screen grid place-items-center p-4" style={{ background: 'linear-gradient(135deg, #0a0a0f 0%, #0d1117 50%, #0a0f0a 100%)' }}>
+      <form onSubmit={submit} className="w-full max-w-md p-8 space-y-5 rounded-2xl backdrop-blur-xl bg-white/5 border border-white/10 shadow-2xl">
+        <div className="text-center">
+          <h1 className="text-4xl font-heading font-bold" style={{ color: '#00ff88', textShadow: '0 0 30px rgba(0,255,136,0.5)' }}>
+            Create Account
+          </h1>
+          <p className="text-sm text-white/60 mt-2">Join StudyPulse and start tracking your progress.</p>
+        </div>
         <Input label="Full name" placeholder="Jane Doe" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
         <Input label="Email" type="email" placeholder="jane@example.com" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
         <Input
@@ -45,9 +50,9 @@ export default function Register() {
         <Button className="w-full" disabled={loading}>
           {loading ? "Creating..." : "Create account"}
         </Button>
-        <p className="text-sm text-white/70">
+        <p className="text-sm text-white/60 text-center">
           Already registered?{" "}
-          <Link to="/login" className="text-gold-400 hover:underline">
+          <Link to="/login" className="text-neon-primary hover:underline">
             Login
           </Link>
         </p>
