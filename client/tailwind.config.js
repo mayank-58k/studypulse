@@ -4,57 +4,43 @@ export default {
   theme: {
     extend: {
       colors: {
-        navy: { 900: "#0f1117", 800: "#1a1d2e", 700: "#252840" },
+        navy: { 900: "#0a0a0f", 800: "#0d1117", 700: "#101722", 600: "#19222f" },
         gold: { 400: "#f0b429", 500: "#d69e2e" },
         neon: {
           primary: "#00ff88",
           secondary: "#00d4ff",
           warning: "#ff6b35",
-          accent: "#ff00ff"
+          danger: "#ff4d4f",
+          accent: "#9b5cff"
         }
       },
       fontFamily: {
-        display: ["Playfair Display", "serif"],
-        sans: ["DM Sans", "sans-serif"],
-        mono: ["JetBrains Mono", "monospace"],
+        display: ["Space Grotesk", "sans-serif"],
         heading: ["Space Grotesk", "sans-serif"],
-        body: ["Inter", "sans-serif"]
+        sans: ["Inter", "sans-serif"],
+        body: ["Inter", "sans-serif"],
+        mono: ["JetBrains Mono", "monospace"]
       },
       keyframes: {
         glow: {
-          "0%, 100%": {
-            boxShadow: "0 0 5px rgba(0, 255, 136, 0.5), 0 0 10px rgba(0, 212, 255, 0.3)"
-          },
-          "50%": {
-            boxShadow: "0 0 20px rgba(0, 255, 136, 0.8), 0 0 30px rgba(0, 212, 255, 0.6)"
-          }
+          "0%, 100%": { boxShadow: "0 0 6px rgba(0,255,136,.25), 0 0 24px rgba(0,212,255,.15)" },
+          "50%": { boxShadow: "0 0 16px rgba(0,255,136,.45), 0 0 36px rgba(0,212,255,.25)" }
         },
         flicker: {
-          "0%, 19%, 21%, 23%, 25%, 54%, 56%, 100%": {
-            opacity: "1"
-          },
-          "20%, 24%, 55%": {
-            opacity: "0.4"
-          }
+          "0%, 19%, 21%, 23%, 25%, 54%, 56%, 100%": { opacity: "1" },
+          "20%, 24%, 55%": { opacity: ".45" }
         },
-        confetti: {
-          "0%": {
-            transform: "translate(0, 0) rotate(0deg)",
-            opacity: "1"
-          },
-          "100%": {
-            transform: "translate(var(--tx), var(--ty)) rotate(720deg)",
-            opacity: "0"
-          }
+        pulseWarning: {
+          "0%, 100%": { boxShadow: "0 0 0 0 rgba(255,77,79,.4)" },
+          "70%": { boxShadow: "0 0 0 14px rgba(255,77,79,0)" }
         }
       },
       animation: {
-        glow: "glow 2s ease-in-out infinite",
-        flicker: "flicker 3s ease-in-out",
-        confetti: "confetti 3s ease-out"
+        glow: "glow 2.2s ease-in-out infinite",
+        flicker: "flicker 2.8s ease-in-out infinite",
+        pulseWarning: "pulseWarning 1.8s infinite"
       }
     }
   },
   plugins: []
 };
-

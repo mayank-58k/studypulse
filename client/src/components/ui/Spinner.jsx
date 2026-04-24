@@ -1,10 +1,10 @@
+import SkeletonLoader from "./SkeletonLoader";
+
 export default function Spinner({ text = "Loading..." }) {
   return (
-    <div className="min-h-[180px] flex items-center justify-center">
-      <div className="flex items-center gap-2 text-sm text-white/70">
-        <div className="h-5 w-5 rounded-full border-2 border-gold-400 border-t-transparent animate-spin" />
-        <span>{text}</span>
-      </div>
+    <div className="card p-5 min-h-[170px] flex flex-col justify-center gap-4">
+      <p className="text-sm text-white/65 font-heading">{text}</p>
+      <SkeletonLoader count={3} height="h-4" />
     </div>
   );
 }
