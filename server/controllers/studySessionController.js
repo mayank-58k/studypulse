@@ -20,7 +20,7 @@ export const weeklySessions = async (req, res) => {
 };
 export const heatmapSessions = async (req, res) => {
   const since = new Date();
-  since.setMonth(since.getMonth() - 6);
+  since.setMonth(since.getMonth() - 12);
   const sessions = await StudySession.find({ user: req.user._id, date: { $gte: since } });
   const map = {};
   for (const s of sessions) {
@@ -45,14 +45,7 @@ export const streakCheckin = async (req, res) => {
   user.lastActiveDate = new Date();
   user.longestStreak = Math.max(user.longestStreak, user.streakCount);
   await user.save();
-  if ([7, 30, 100, 365].includes(user.streakCount)) {
-    await Badge.create({
-      user: user._id,
-      title: `${user.streakCount} Day Streak`,
-      description: `Maintained a ${user.streakCount} day streak`,
-      type: "streak"
-    });
-  }
+  await checkAndAwardBadges(req.user._id);
   res.json({ streakCount: user.streakCount, longestStreak: user.longestStreak });
 };
 

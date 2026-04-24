@@ -1,193 +1,164 @@
 import { useEffect, useMemo, useState } from "react";
-import { Calendar, dateFnsLocalizer } from "react-big-calendar";
-import { format, parse, startOfWeek, getDay } from "date-fns";
-import { enUS } from "date-fns/locale";
-import "react-big-calendar/lib/css/react-big-calendar.css";
+import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import api from "../api/axios";
-import Modal from "../components/ui/Modal";
-import Input from "../components/ui/Input";
-import Button from "../components/ui/Button";
 import Spinner from "../components/ui/Spinner";
-import { formatDisplayDate } from "../utils/dateHelpers";
 
-const localizer = dateFnsLocalizer({
-  format,
-  parse,
-  startOfWeek,
-  getDay,
-  locales: { "en-US": enUS }
-});
+const intensity = ["bg-navy-700", "bg-emerald-900", "bg-emerald-700", "bg-emerald-500", "bg-neon-primary"];
+const dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-const initialForm = { title: "", subject: "", type: "study", start: "", end: "", color: "#10b981", notes: "" };
+const formatDateKey = (date) => date.toISOString().slice(0, 10);
 
 export default function CalendarPage() {
-  const [events, setEvents] = useState([]);
-  const [subjects, setSubjects] = useState([]);
-  const [selectedDate, setSelectedDate] = useState(new Date());
-  const [selectedEvent, setSelectedEvent] = useState(null);
-  const [form, setForm] = useState(initialForm);
   const [loading, setLoading] = useState(true);
-  const [openModal, setOpenModal] = useState(false);
-
-  const load = async () => {
-    setLoading(true);
-    try {
-      const [eventRes, subjectRes] = await Promise.all([api.get("/calendar"), api.get("/subjects")]);
-      setSubjects(subjectRes.data);
-      setEvents(
-        eventRes.data.map((event) => ({
-          ...event,
-          start: new Date(event.start),
-          end: new Date(event.end),
-          title: event.title
-        }))
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [sessions, setSessions] = useState([]);
+  const [hovered, setHovered] = useState(null);
 
   useEffect(() => {
-    load();
+    (async () => {
+      setLoading(true);
+      try {
+        const { data } = await api.get("/sessions");
+        setSessions(data || []);
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
-  const dayEvents = useMemo(
-    () => events.filter((event) => new Date(event.start).toDateString() === new Date(selectedDate).toDateString()),
-    [events, selectedDate]
-  );
-  const upcoming = [...events].sort((a, b) => new Date(a.start) - new Date(b.start)).slice(0, 7);
+  const dailyStats = useMemo(() => {
+    const map = {};
+    sessions.forEach((session) => {
+      const key = formatDateKey(new Date(session.date));
+      if (!map[key]) map[key] = { sessions: 0, minutes: 0, subjects: new Set() };
+      map[key].sessions += 1;
+      map[key].minutes += session.duration;
+      if (session.subject?.name) map[key].subjects.add(session.subject.name);
+    });
+    return map;
+  }, [sessions]);
 
-  const saveEvent = async (e) => {
-    e.preventDefault();
-    if (!form.title || !form.start || !form.end) return;
-    const payload = { ...form, subject: form.subject || null };
-    if (selectedEvent?._id) await api.put(`/calendar/${selectedEvent._id}`, payload);
-    else await api.post("/calendar", payload);
-    setOpenModal(false);
-    setSelectedEvent(null);
-    setForm(initialForm);
-    load();
-  };
+  const heatmap = useMemo(() => {
+    const end = new Date();
+    const start = new Date();
+    start.setMonth(start.getMonth() - 12);
+    start.setDate(start.getDate() - start.getDay());
 
-  const deleteEvent = async () => {
-    if (!selectedEvent?._id) return;
-    await api.delete(`/calendar/${selectedEvent._id}`);
-    setOpenModal(false);
-    setSelectedEvent(null);
-    setForm(initialForm);
-    load();
-  };
+    const cells = [];
+    const monthMarkers = [];
+    const cursor = new Date(start);
+    let weekIndex = 0;
+
+    while (cursor <= end) {
+      if (cursor.getDay() === 0) {
+        const monthKey = `${cursor.getFullYear()}-${cursor.getMonth()}`;
+        const prev = monthMarkers[monthMarkers.length - 1];
+        if (!prev || prev.key !== monthKey) {
+          monthMarkers.push({ key: monthKey, label: cursor.toLocaleString("default", { month: "short" }), weekIndex });
+        }
+        weekIndex += 1;
+      }
+      const key = formatDateKey(cursor);
+      const stat = dailyStats[key];
+      cells.push({
+        key,
+        weekday: cursor.getDay(),
+        week: Math.floor((cursor - start) / (1000 * 60 * 60 * 24 * 7)),
+        sessions: stat?.sessions || 0,
+        minutes: stat?.minutes || 0,
+        subjects: stat ? [...stat.subjects] : []
+      });
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    return { cells, monthMarkers };
+  }, [dailyStats]);
+
+  const monthlyBreakdown = useMemo(() => {
+    const map = {};
+    sessions.forEach((session) => {
+      const d = new Date(session.date);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      map[key] = (map[key] || 0) + session.duration / 60;
+    });
+
+    const now = new Date();
+    const output = [];
+    for (let i = 11; i >= 0; i -= 1) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      output.push({ month: d.toLocaleString("default", { month: "short" }), hours: Number((map[key] || 0).toFixed(1)) });
+    }
+    return output;
+  }, [sessions]);
 
   if (loading) return <Spinner text="Loading calendar..." />;
 
   return (
     <div className="space-y-4">
-      <div className="card p-4 flex items-center justify-between">
-        <h2 className="text-2xl font-display">Calendar</h2>
-        <Button onClick={() => setOpenModal(true)}>Add Event</Button>
-      </div>
-
-      <div className="grid xl:grid-cols-4 gap-3">
-        <div className="card p-3 xl:col-span-3">
-          <div className="h-[620px] text-black">
-            <Calendar
-              localizer={localizer}
-              events={events}
-              startAccessor="start"
-              endAccessor="end"
-              views={["month", "week", "day", "agenda"]}
-              onSelectSlot={(slot) => {
-                setForm((prev) => ({ ...prev, start: slot.start.toISOString().slice(0, 16), end: slot.end.toISOString().slice(0, 16) }));
-                setSelectedEvent(null);
-                setOpenModal(true);
-              }}
-              selectable
-              onSelectEvent={(event) => {
-                setSelectedEvent(event);
-                setForm({
-                  title: event.title,
-                  subject: event.subject?._id || event.subject || "",
-                  type: event.type || "study",
-                  start: new Date(event.start).toISOString().slice(0, 16),
-                  end: new Date(event.end).toISOString().slice(0, 16),
-                  color: event.color || "#10b981",
-                  notes: event.notes || ""
-                });
-                setOpenModal(true);
-              }}
-              onNavigate={(date) => setSelectedDate(date)}
-              eventPropGetter={(event) => ({
-                style: { backgroundColor: event.color || "#10b981", borderRadius: 8, border: "none", color: "#0f1117" }
-              })}
-            />
-          </div>
-        </div>
-        <div className="card p-4 space-y-3">
-          <h3 className="text-lg">Events on {formatDisplayDate(selectedDate)}</h3>
-          {dayEvents.length ? (
-            dayEvents.map((event) => (
-              <div key={event._id} className="bg-navy-700 rounded-xl p-3">
-                <p>{event.title}</p>
-                <p className="text-xs text-white/60">{event.type}</p>
-              </div>
-            ))
-          ) : (
-            <p className="text-sm text-white/60">No events this day.</p>
-          )}
-        </div>
-      </div>
-
       <div className="card p-4">
-        <h3 className="text-lg mb-2">Upcoming 7 Events</h3>
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-2">
-          {upcoming.map((event) => (
-            <div key={event._id} className="bg-navy-700 rounded-lg p-3">
-              <p>{event.title}</p>
-              <p className="text-xs text-white/60">{formatDisplayDate(event.start)}</p>
+        <h2 className="text-2xl font-display">Study Activity Calendar</h2>
+        <p className="text-sm text-white/70">LeetCode-style heatmap for your last 12 months</p>
+      </div>
+
+      <div className="card p-4 overflow-auto relative">
+        <div className="flex text-xs text-white/60 mb-2 pl-10 min-w-[900px]">
+          {heatmap.monthMarkers.map((month) => (
+            <div key={month.key} style={{ marginLeft: `${month.weekIndex === 0 ? 0 : month.weekIndex * 14}px` }} className="absolute">
+              {month.label}
             </div>
           ))}
         </div>
+
+        <div className="flex gap-2 min-w-[900px] mt-6">
+          <div className="grid grid-rows-7 gap-1 pr-2 text-[10px] text-white/55 w-8">
+            {dayLabels.map((day) => (
+              <span key={day}>{day[0]}</span>
+            ))}
+          </div>
+          <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${Math.max(...heatmap.cells.map((c) => c.week)) + 1}, minmax(0, 1fr))`, gridTemplateRows: "repeat(7, 12px)" }}>
+            {heatmap.cells.map((cell) => {
+              const level = Math.min(4, cell.sessions);
+              return (
+                <div
+                  key={cell.key}
+                  className={`h-3 w-3 rounded-[3px] ${intensity[level]} border border-white/10 hover:scale-125 transition-transform cursor-pointer`}
+                  style={{ gridColumn: cell.week + 1, gridRow: cell.weekday + 1 }}
+                  onMouseEnter={() => setHovered(cell)}
+                  onMouseLeave={() => setHovered(null)}
+                />
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="mt-4 flex items-center justify-end gap-2 text-xs text-white/60">
+          <span>Less</span>
+          {intensity.map((tone, i) => (
+            <span key={i} className={`w-3 h-3 rounded-[3px] ${tone} border border-white/10`} />
+          ))}
+          <span>More</span>
+        </div>
+
+        {hovered ? (
+          <div className="mt-3 text-xs text-white/80 bg-navy-700/80 border border-white/10 rounded-lg p-2 inline-block">
+            <p>{hovered.key}</p>
+            <p>{hovered.sessions} sessions</p>
+            <p>{hovered.subjects.length ? hovered.subjects.join(", ") : "No subjects logged"}</p>
+          </div>
+        ) : null}
       </div>
 
-      <Modal open={openModal} title={selectedEvent ? "Edit Event" : "Add Event"} onClose={() => setOpenModal(false)}>
-        <form onSubmit={saveEvent} className="space-y-3">
-          <Input label="Title" value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))} />
-          <label className="block space-y-1">
-            <span className="text-sm text-white/70">Type</span>
-            <select className="input" value={form.type} onChange={(e) => setForm((p) => ({ ...p, type: e.target.value }))}>
-              {["assignment", "exam", "study", "reminder", "other"].map((type) => (
-                <option key={type}>{type}</option>
-              ))}
-            </select>
-          </label>
-          <label className="block space-y-1">
-            <span className="text-sm text-white/70">Subject</span>
-            <select className="input" value={form.subject} onChange={(e) => setForm((p) => ({ ...p, subject: e.target.value }))}>
-              <option value="">No subject</option>
-              {subjects.map((subject) => (
-                <option key={subject._id} value={subject._id}>
-                  {subject.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <Input label="Start" type="datetime-local" value={form.start} onChange={(e) => setForm((p) => ({ ...p, start: e.target.value }))} />
-          <Input label="End" type="datetime-local" value={form.end} onChange={(e) => setForm((p) => ({ ...p, end: e.target.value }))} />
-          <Input label="Color" type="color" value={form.color} onChange={(e) => setForm((p) => ({ ...p, color: e.target.value }))} />
-          <label className="block space-y-1">
-            <span className="text-sm text-white/70">Notes</span>
-            <textarea className="input min-h-24" value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} />
-          </label>
-          <div className="flex gap-2">
-            <Button className="flex-1">{selectedEvent ? "Save changes" : "Create event"}</Button>
-            {selectedEvent ? (
-              <Button type="button" variant="secondary" className="flex-1" onClick={deleteEvent}>
-                Delete
-              </Button>
-            ) : null}
-          </div>
-        </form>
-      </Modal>
+      <div className="card p-4 h-80">
+        <h3 className="text-lg font-heading mb-2">Monthly Study Hours</h3>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={monthlyBreakdown}>
+            <XAxis dataKey="month" stroke="#ffffff88" />
+            <YAxis stroke="#ffffff66" />
+            <Tooltip formatter={(value) => [`${value}h`, "Hours"]} />
+            <Bar dataKey="hours" fill="#00d4ff" radius={[6, 6, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }

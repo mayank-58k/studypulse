@@ -30,26 +30,15 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen grid place-items-center p-4 bg-navy-900">
-      <form onSubmit={submit} className="card w-full max-w-md p-6 space-y-4">
-        <h1 className="text-4xl font-display text-gold-400">Create Account</h1>
+    <div className="min-h-screen grid place-items-center p-4">
+      <form onSubmit={submit} className="card w-full max-w-md p-6 space-y-4 shadow-[0_0_40px_rgba(0,255,136,.2)]">
+        <h1 className="text-4xl font-display text-neon-primary">Create Account</h1>
         <Input label="Full name" placeholder="Jane Doe" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
         <Input label="Email" type="email" placeholder="jane@example.com" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-        <Input
-          label="Password"
-          type="password"
-          placeholder="Minimum 6 characters"
-          value={form.password}
-          onChange={(e) => setForm({ ...form, password: e.target.value })}
-        />
-        <Button className="w-full" disabled={loading}>
-          {loading ? "Creating..." : "Create account"}
-        </Button>
+        <Input label="Password" type="password" placeholder="Minimum 6 characters" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+        <Button className="w-full" disabled={loading}>{loading ? "Creating..." : "Create account"}</Button>
         <p className="text-sm text-white/70">
-          Already registered?{" "}
-          <Link to="/login" className="text-gold-400 hover:underline">
-            Login
-          </Link>
+          Already registered? <Link to="/login" className="text-neon-secondary hover:underline">Login</Link>
         </p>
       </form>
     </div>

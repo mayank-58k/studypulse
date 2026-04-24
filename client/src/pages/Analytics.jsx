@@ -19,7 +19,7 @@ import api from "../api/axios";
 import Spinner from "../components/ui/Spinner";
 import { calcWeightedAverage } from "../utils/gpaCalculator";
 
-const colors = ["#f0b429", "#10b981", "#60a5fa", "#f472b6", "#f97316", "#a78bfa"];
+const colors = ["#00d4ff", "#00ff88", "#60a5fa", "#f472b6", "#f97316", "#a78bfa"];
 
 export default function Analytics() {
   const [loading, setLoading] = useState(true);
@@ -86,6 +86,23 @@ export default function Analytics() {
     return Object.entries(map).map(([week, hours]) => ({ week, hours: Number(hours.toFixed(1)) }));
   }, [sessions]);
 
+  const bestDay = useMemo(() => {
+    const map = {};
+    sessions.forEach((s) => {
+      const key = new Date(s.date).toISOString().slice(0, 10);
+      map[key] = (map[key] || 0) + s.duration / 60;
+    });
+    const rows = Object.entries(map).map(([date, hours]) => ({ date, hours: Number(hours.toFixed(1)) }));
+    return rows.sort((a, b) => b.hours - a.hours).slice(0, 5);
+  }, [sessions]);
+
+  const longestSession = useMemo(() => Math.max(0, ...sessions.map((s) => s.duration / 60)), [sessions]);
+  const bestDayHours = bestDay[0]?.hours || 0;
+  const bestWeekHours = Math.max(0, ...weeklyHours.map((w) => w.hours));
+  const currentWeek = weeklyHours[weeklyHours.length - 1]?.hours || 0;
+  const previousWeek = weeklyHours[weeklyHours.length - 2]?.hours || 0;
+  const comparison = previousWeek > 0 ? Math.round(((currentWeek - previousWeek) / previousWeek) * 100) : 100;
+
   const scatterData = useMemo(
     () =>
       performanceData.map((perf) => ({
@@ -96,17 +113,35 @@ export default function Analytics() {
     [performanceData, studyPerSubject]
   );
 
-  const sortedPerformance = [...performanceData].sort((a, b) => b.average - a.average);
-  const best = sortedPerformance[0];
-  const worst = sortedPerformance[sortedPerformance.length - 1];
-
   if (loading) return <Spinner text="Loading analytics..." />;
 
   return (
     <div className="space-y-4">
       <div className="card p-4">
-        <h2 className="text-2xl font-display">Analytics</h2>
-        <p className="text-sm text-white/70">Semester summary and trend insights</p>
+        <h2 className="text-2xl font-display">Study Hours Leaderboard</h2>
+        <p className="text-sm text-white/70">
+          You studied {currentWeek.toFixed(1)} hours this week — that&apos;s {comparison}% {comparison >= 0 ? "more" : "less"} than last week.
+        </p>
+      </div>
+
+      <div className="grid lg:grid-cols-3 gap-3">
+        <div className="card p-4 lg:col-span-2">
+          <h3 className="mb-2 font-heading">Top Study Hours Days</h3>
+          <div className="grid sm:grid-cols-2 gap-2">
+            {bestDay.map((day, i) => (
+              <div key={day.date} className={`rounded-xl p-3 border ${i === 0 ? "border-neon-primary bg-neon-primary/10" : "border-white/10 bg-white/5"}`}>
+                <p>{day.date}</p>
+                <p className="text-neon-primary font-mono">{day.hours}h</p>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="card p-4 space-y-3">
+          <h3 className="font-heading">Personal Bests</h3>
+          <p className="text-sm">Longest session: <span className="text-neon-primary">{longestSession.toFixed(1)}h</span></p>
+          <p className="text-sm">Most in one day: <span className="text-neon-secondary">{bestDayHours.toFixed(1)}h</span></p>
+          <p className="text-sm">Most in one week: <span className="text-neon-primary">{bestWeekHours.toFixed(1)}h</span></p>
+        </div>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-3">
@@ -118,7 +153,7 @@ export default function Analytics() {
               <XAxis dataKey="name" />
               <YAxis />
               <Tooltip />
-              <Bar dataKey="average" fill="#f0b429" />
+              <Bar dataKey="average" fill="#00d4ff" />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -146,7 +181,7 @@ export default function Analytics() {
               <XAxis dataKey="date" hide />
               <YAxis domain={[0, 100]} />
               <Tooltip />
-              <Line dataKey="score" stroke="#10b981" strokeWidth={2} />
+              <Line dataKey="score" stroke="#00ff88" strokeWidth={2} />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -164,35 +199,21 @@ export default function Analytics() {
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-3">
-        <div className="card p-4 lg:col-span-2 h-72">
-          <h3 className="mb-2">Weekly Study Hours (Last 8 Weeks)</h3>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={weeklyHours}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#ffffff22" />
-              <XAxis dataKey="week" hide />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="hours" fill="#a78bfa" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="card p-4">
-          <h3 className="mb-2">Best / Worst Subject</h3>
-          <div className="space-y-3">
-            <div className="bg-emerald-500/20 rounded-xl p-3">
-              <p className="text-sm text-emerald-300">Best</p>
-              <p>{best?.name || "N/A"}</p>
-              <p className="text-xs">{best?.average?.toFixed?.(2) ?? 0}%</p>
-            </div>
-            <div className="bg-rose-500/20 rounded-xl p-3">
-              <p className="text-sm text-rose-300">Needs Improvement</p>
-              <p>{worst?.name || "N/A"}</p>
-              <p className="text-xs">{worst?.average?.toFixed?.(2) ?? 0}%</p>
-            </div>
-            <p className="text-xs text-white/60">Subjects: {subjects.length} | Sessions: {sessions.length}</p>
-          </div>
-        </div>
+      <div className="card p-4 h-72">
+        <h3 className="mb-2">Weekly Study Hours (Last 8 Weeks)</h3>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={weeklyHours}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#ffffff22" />
+            <XAxis dataKey="week" hide />
+            <YAxis />
+            <Tooltip />
+            <Bar dataKey="hours" radius={[6, 6, 0, 0]}>
+              {weeklyHours.map((entry) => (
+                <Cell key={entry.week} fill={entry.hours === bestWeekHours ? "#00ff88" : "#8b5cf6"} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
       </div>
     </div>
   );
