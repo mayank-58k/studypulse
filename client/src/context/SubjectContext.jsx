@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import api from "../api/axios";
 
 const SubjectContext = createContext(null);
@@ -22,7 +22,20 @@ export function SubjectProvider({ children }) {
     loadSubjects();
   }, []);
 
-  return <SubjectContext.Provider value={{ subjects, setSubjects, loadingSubjects, loadSubjects }}>{children}</SubjectContext.Provider>;
+  const value = useMemo(
+    () => ({
+      subjects,
+      setSubjects,
+      loadingSubjects,
+      loadSubjects,
+      addSubject: (subject) => setSubjects((prev) => [subject, ...prev]),
+      updateSubjectInStore: (subject) => setSubjects((prev) => prev.map((s) => (s._id === subject._id ? subject : s))),
+      removeSubjectFromStore: (subjectId) => setSubjects((prev) => prev.filter((s) => s._id !== subjectId))
+    }),
+    [subjects, loadingSubjects]
+  );
+
+  return <SubjectContext.Provider value={value}>{children}</SubjectContext.Provider>;
 }
 
 export const useSubjectContext = () => useContext(SubjectContext);

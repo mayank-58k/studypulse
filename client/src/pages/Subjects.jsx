@@ -6,14 +6,16 @@ import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import Modal from "../components/ui/Modal";
 import Spinner from "../components/ui/Spinner";
+import EmptyState from "../components/ui/EmptyState";
+import { BookOpen } from "lucide-react";
 import { calcWeightedAverage } from "../utils/gpaCalculator";
+import { useSubjectContext } from "../context/SubjectContext";
 
-const blankSubject = { name: "", color: "#10b981", icon: "BookOpen", targetGrade: 85, semester: "Spring" };
+const blankSubject = { name: "", color: "#00ff88", icon: "BookOpen", targetGrade: 85, semester: "Spring" };
 const blankGrade = { category: "quiz", title: "", score: "", maxScore: "100", weight: "1", date: "" };
 
 export default function Subjects() {
-  const [subjects, setSubjects] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { subjects, loadingSubjects, addSubject, updateSubjectInStore, removeSubjectFromStore, loadSubjects } = useSubjectContext();
   const [openSubjectModal, setOpenSubjectModal] = useState(false);
   const [subjectForm, setSubjectForm] = useState(blankSubject);
   const [editing, setEditing] = useState(null);
@@ -22,18 +24,6 @@ export default function Subjects() {
   const [gradeForm, setGradeForm] = useState(blankGrade);
   const [semesterFilter, setSemesterFilter] = useState("All");
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const { data } = await api.get("/subjects");
-      setSubjects(data);
-    } catch (e) {
-      toast.error(e.response?.data?.message || "Failed to load subjects");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const loadGrades = async (subjectId) => {
     setActiveId(subjectId);
     const { data } = await api.get(`/subjects/${subjectId}/grades`);
@@ -41,7 +31,7 @@ export default function Subjects() {
   };
 
   useEffect(() => {
-    load();
+    loadSubjects();
   }, []);
 
   const filteredSubjects = useMemo(
@@ -67,13 +57,17 @@ export default function Subjects() {
     e.preventDefault();
     if (!subjectForm.name.trim()) return toast.error("Subject name is required");
     try {
-      if (editing) await api.put(`/subjects/${editing._id}`, subjectForm);
-      else await api.post("/subjects", subjectForm);
+      if (editing) {
+        const { data } = await api.put(`/subjects/${editing._id}`, subjectForm);
+        updateSubjectInStore(data);
+      } else {
+        const { data } = await api.post("/subjects", subjectForm);
+        addSubject(data);
+      }
       toast.success(editing ? "Subject updated" : "Subject created");
       setOpenSubjectModal(false);
       setEditing(null);
       setSubjectForm(blankSubject);
-      load();
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to save subject");
     }
@@ -82,12 +76,12 @@ export default function Subjects() {
   const removeSubject = async (id) => {
     if (!window.confirm("Delete subject and related grades?")) return;
     await api.delete(`/subjects/${id}`);
+    removeSubjectFromStore(id);
     toast.success("Subject deleted");
     if (activeId === id) {
       setActiveId(null);
       setGrades([]);
     }
-    load();
   };
 
   const addGrade = async (e) => {
@@ -109,7 +103,7 @@ export default function Subjects() {
     loadGrades(activeId);
   };
 
-  if (loading) return <Spinner text="Loading subjects..." />;
+  if (loadingSubjects) return <Spinner text="Loading subjects..." />;
 
   return (
     <div className="space-y-4">
@@ -133,16 +127,16 @@ export default function Subjects() {
           const subjectGrades = grades.filter((g) => g.subject === subject._id || g.subject?._id === subject._id);
           const avg = calcWeightedAverage(subjectGrades);
           return (
-            <div className="card p-4" key={subject._id}>
+            <div className="card p-4 border-l-4 interactive hover:shadow-[0_0_25px_rgba(0,255,136,0.22)]" key={subject._id} style={{ borderLeftColor: subject.color }}>
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-lg">{subject.name}</h3>
+                  <h3 className="text-lg font-heading">{subject.name}</h3>
                   <p className="text-sm text-white/60">{subject.semester || "Unknown semester"}</p>
                 </div>
                 <div className="w-4 h-4 rounded-full" style={{ backgroundColor: subject.color }} />
               </div>
-              <p className="mt-2 text-gold-400 font-mono">Average: {avg}%</p>
-              <div className="mt-3 flex gap-2">
+              <p className="mt-2 text-neon-primary font-mono">Average: {avg}%</p>
+              <div className="mt-3 flex gap-2 flex-wrap">
                 <Button variant="secondary" onClick={() => loadGrades(subject._id)}>
                   View Grades
                 </Button>
@@ -170,6 +164,8 @@ export default function Subjects() {
           );
         })}
       </div>
+
+      {!filteredSubjects.length ? <EmptyState icon={BookOpen} title="No subjects yet" message="Add your first subject and it will instantly appear in assignment forms." /> : null}
 
       {activeId ? (
         <div className="grid lg:grid-cols-2 gap-3">
@@ -206,7 +202,7 @@ export default function Subjects() {
                   <XAxis dataKey="title" hide />
                   <YAxis domain={[0, 100]} />
                   <Tooltip />
-                  <Line type="monotone" dataKey="percent" stroke="#f0b429" strokeWidth={2} />
+                  <Line type="monotone" dataKey="percent" stroke="#00ff88" strokeWidth={2} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -232,12 +228,7 @@ export default function Subjects() {
           <Input label="Name" value={subjectForm.name} onChange={(e) => setSubjectForm((p) => ({ ...p, name: e.target.value }))} />
           <Input label="Color" type="color" value={subjectForm.color} onChange={(e) => setSubjectForm((p) => ({ ...p, color: e.target.value }))} />
           <Input label="Icon" value={subjectForm.icon} onChange={(e) => setSubjectForm((p) => ({ ...p, icon: e.target.value }))} />
-          <Input
-            label="Target grade"
-            type="number"
-            value={subjectForm.targetGrade}
-            onChange={(e) => setSubjectForm((p) => ({ ...p, targetGrade: Number(e.target.value) }))}
-          />
+          <Input label="Target grade" type="number" value={subjectForm.targetGrade} onChange={(e) => setSubjectForm((p) => ({ ...p, targetGrade: Number(e.target.value) }))} />
           <Input label="Semester" value={subjectForm.semester} onChange={(e) => setSubjectForm((p) => ({ ...p, semester: e.target.value }))} />
           <Button className="w-full">{editing ? "Save changes" : "Create subject"}</Button>
         </form>
